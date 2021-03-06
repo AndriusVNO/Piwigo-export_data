@@ -40,6 +40,8 @@ if (isset($_GET['type']))
   // create a file pointer connected to the output stream
   $output = fopen('php://output', 'w');
   fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
+
+  // create URL list of albums
   if ('albums' == $_GET['type'])
   {
     $query = '
@@ -51,7 +53,6 @@ SELECT
   ORDER BY id ASC
 ;';
     $result = pwg_query($query);
-
     set_make_full_url();
     while ($row = pwg_db_fetch_assoc($result))
     {
@@ -59,6 +60,34 @@ SELECT
     }
   }
 
+  // create list of albums with details
+  if ('albums1' == $_GET['type'])
+  {
+    $query = '
+SELECT
+    id,
+    name,
+    comment,
+    dir,
+    uppercats,
+    lastmodified
+  FROM '.CATEGORIES_TABLE.'
+  ORDER BY id ASC
+;';
+    $result = pwg_query($query);
+    $is_first = true;
+    while ($row = pwg_db_fetch_assoc($result))
+    {
+      if ($is_first)
+      {
+        fputcsv($output, array_keys($row));
+        $is_first = false;
+      }
+      fputcsv($output, $row);
+    }
+  }
+
+  // create list of photos with details
   if ('photos' == $_GET['type'])
   {
     $query = '
@@ -84,7 +113,6 @@ SELECT
   ORDER BY i.id
 ;';
     $result = pwg_query($query);
-
     $is_first = true;
     while ($row = pwg_db_fetch_assoc($result))
     {
@@ -93,11 +121,11 @@ SELECT
         fputcsv($output, array_keys($row));
         $is_first = false;
       }
-      
-      fputcsv($output, $row);
+        fputcsv($output, $row);
     }
   }
 
+  // create list of comments
   if ('comments' == $_GET['type'])
   {
     $query = '
@@ -117,7 +145,6 @@ SELECT
   ORDER BY id
 ;';
     $result = pwg_query($query);
-
     $is_first = true;
     while ($row = pwg_db_fetch_assoc($result))
     {
@@ -126,11 +153,11 @@ SELECT
         fputcsv($output, array_keys($row));
         $is_first = false;
       }
-
       fputcsv($output, $row);
     }
   }
 
+  // create info about downloads
   if ('downloads' == $_GET['type'])
   {
     $query = '
@@ -146,7 +173,6 @@ SELECT
   ORDER BY id DESC
 ;';
     $history_lines = query2array($query);
-
     if (count($history_lines) == 0)
     {
       exit();
@@ -170,16 +196,13 @@ SELECT
   WHERE image_id IN ('.implode(',', array_keys($image_ids)).')
 ;';
     $category_id_of_image = query2array($query, 'image_id', 'category_id');
-
     $category_path_of = array();
     $category_ids = array();
     foreach ($category_id_of_image as $image_id => $category_id)
     {
       @$category_ids[$category_id]++;
     }
-
     $cat_max_level = 0;
-
     if (count($category_ids) > 0)
     {
       // we're going to need 2 SQL queries: first one to get the list of uppercats,
@@ -190,14 +213,12 @@ SELECT id,uppercats
   WHERE id IN ('.implode(',', array_keys($category_ids)).')
 ;';
       $uppercats_of = query2array($query, 'id', 'uppercats');
-
       $all_cat_ids = array();
       foreach ($uppercats_of as $uppercats)
       {
         $all_cat_ids = array_merge($all_cat_ids, explode(',', $uppercats));
       }
       $all_cat_ids = array_unique($all_cat_ids);
-
       $query = '
 SELECT
     id,
@@ -207,7 +228,6 @@ SELECT
   WHERE id IN ('.implode(',', $all_cat_ids).')
 ;';
       $cat_map = query2array($query, 'id');
-
       foreach ($uppercats_of as $id => $uppercats)
       {
         $cats = array();
@@ -215,12 +235,10 @@ SELECT
         {
           $cats[] = $cat_map[$id];
         }
-
         if (count($cats) > $cat_max_level)
         {
           $cat_max_level = count($cats);
         }
-
         $conf['level_separator'] = '~#~'; // in case an album name would contain a "/"
         $category_path_of[$id] = explode($conf['level_separator'], get_cat_display_name($cats, null));
       }
@@ -273,7 +291,6 @@ SELECT
             $row[] = 'album level '.$i;
           }
         }
-
         fputcsv($output, $row);
         // echo '<pre>'; print_r($row); echo '</pre>';
         $is_first = false;
